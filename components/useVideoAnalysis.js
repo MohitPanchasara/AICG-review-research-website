@@ -1,4 +1,6 @@
+// components/useVideoAnalysis.js
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { track } from '@vercel/analytics';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
@@ -177,6 +179,20 @@ export default function useVideoAnalysis() {
       setLastUpdated(new Date().toLocaleTimeString());
     }, 4200);
   }
+
+  // --------- Vercel Analytics: Track when inference completes ---------
+  useEffect(() => {
+    if (status === 'done' && finalModelScore != null) {
+      // Keep it anonymous: avoid filenames/PII
+      track('analysis_done', {
+        score: Number(finalModelScore.toFixed(3)),
+        frames: Array.isArray(frames) ? frames.length : 0,
+        hasClips: Array.isArray(clips) && clips.length > 0 ? 1 : 0,
+        mock: isMock ? 1 : 0,
+      });
+    }
+  }, [status, finalModelScore, frames, clips, isMock]);
+  // --------------------------------------------------------------------
 
   return {
     file, videoUrl, status, progress, lastUpdated, isMock, errorMsg,

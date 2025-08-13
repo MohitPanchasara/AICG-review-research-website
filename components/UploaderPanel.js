@@ -1,4 +1,5 @@
 import styles from './UploaderPanel.module.css';
+import { track } from '@vercel/analytics';
 
 export default function UploaderPanel({ file, videoUrl, status, onFileChange, onAnalyze, onReset }) {
   return (
@@ -20,7 +21,11 @@ export default function UploaderPanel({ file, videoUrl, status, onFileChange, on
       )}
 
       <div className={styles.actions}>
-        <button className={styles.primaryBtn} onClick={onAnalyze} disabled={!file || status === 'processing'}>
+        <button
+          className={styles.primaryBtn}
+          onClick={() => { track('analyze_clicked'); onAnalyze(); }}
+          disabled={!file || status === 'processing'}
+        >
           {status === 'processing' ? 'Analyzing…' : 'Analyze Video'}
         </button>
         <button className={styles.secondaryBtn} onClick={onReset} disabled={status === 'processing' && !file}>
