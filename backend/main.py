@@ -6,10 +6,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from inference import VideoScorer
+import tempfile
+
 
 # ---- Env/config ----
 MODEL_PATH = os.getenv("MODEL_PATH", "weights/model.pth")
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", "tmp")
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/tmp/aivideo")  # writable on Spaces
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
 ALLOWED_ORIGINS = [o.strip() for o in os.getenv(
     "ALLOWED_ORIGINS",
     "http://localhost:3000,http://127.0.0.1:3000"
@@ -51,11 +55,10 @@ class AnalyzeResp(BaseModel):
 @app.post("/analyze", response_model=AnalyzeResp)
 def analyze(file: UploadFile = File(...)):
     job_id = uuid.uuid4().hex[:12]
-    dst_path = os.path.join(UPLOAD_DIR, f"{job_id}_{file.filename}")
-
-    # save uploaded file
-    with open(dst_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+    safe_suffix = os.path.splitext(file.filename or "")[-1][:8]  # keep short extension
+    with tempfile.NamedTemporaryFile(dir=UPLOAD_DIR, suffix=safe_suffix, delete=False) as tmpf:
+        shutil.copyfileobj(file.file, tmpf)
+        dst_path = tmpf.name
 
     JOBS[job_id] = {
         "status": "queued",

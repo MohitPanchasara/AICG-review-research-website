@@ -5,7 +5,9 @@
   align-items: stretch;
   position: relative;
   padding-bottom: 80px;
+  padding-top: var(--header-h);   /* NEW: content starts below the header */
 }
+
 .bgGlow{
   position: fixed;
   inset: 0;

@@ -28,7 +28,7 @@ export default function Home() {
       <section className={styles.panelGrid}>
         {/* Left: Uploader */}
         <div className={styles.panel}>
-          <h2 className={styles.h2}>1) Upload</h2>
+          <h2 className={styles.h2}> Upload</h2>
           <UploaderPanel
             file={file}
             videoUrl={videoUrl}
@@ -55,7 +55,7 @@ export default function Home() {
 
         {/* Right: Score only */}
         <div className={styles.panel}>
-          <h2 className={styles.h2}>2) Result</h2>
+          <h2 className={styles.h2}> Result</h2>
 
           <ResultSection
             title="Final Model Score"
