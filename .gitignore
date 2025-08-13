@@ -13,6 +13,10 @@
 # testing
 /coverage
 
+# Cache files and weights
+/backend/weights/
+/backend/__pycache__/
+
 # next.js
 /.next/
 /out/
@@ -32,6 +36,9 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+
+# model files
+.pth*
 
 # vercel
 .vercel

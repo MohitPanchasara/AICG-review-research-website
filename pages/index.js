@@ -3,21 +3,16 @@ import HeaderBar from '@/components/HeaderBar';
 import UploaderPanel from '@/components/UploaderPanel';
 import ProcessingStatus from '@/components/ProcessingStatus';
 import ResultSection from '@/components/ResultSection';
-import IntuitiveMeter from '@/components/IntuitiveMeter';
-import AnomalyList from '@/components/AnomalyList';
 import DecisionCard from '@/components/DecisionCard';
-import ClipGrid from '@/components/ClipGrid';
-import FrameGrid from '@/components/FrameGrid';
 import FooterBar from '@/components/FooterBar';
 import useVideoAnalysis from '@/components/useVideoAnalysis';
 
 export default function Home() {
   const {
-    // core state
     file, videoUrl, status, progress, lastUpdated, isMock, errorMsg,
     // results
-    summary, intuitiveScore, anomalies, personPresent,
-    thresholdScore, finalModelScore, decision, clips, frames,
+    // summary, intuitiveScore, anomalies, personPresent, thresholdScore, finalModelScore, clips, frames,
+    thresholdScore, finalModelScore,
     // actions
     onFileChange, handleAnalyze, hardReset,
   } = useVideoAnalysis();
@@ -26,10 +21,10 @@ export default function Home() {
     <main className={styles.page}>
       <div className={styles.bgGlow} aria-hidden />
 
-      <HeaderBar title="AI vs Real Video Classifier" subtitle="Upload a video → Analyze → See detailed results" />
+      <HeaderBar title="AI vs Real Video Classifier" subtitle="Upload a video → Analyze → Final score" />
 
       <section className={styles.panelGrid}>
-        {/* Left: Uploader side */}
+        {/* Left: Uploader */}
         <div className={styles.panel}>
           <h2 className={styles.h2}>1) Upload</h2>
           <UploaderPanel
@@ -56,45 +51,31 @@ export default function Home() {
           )}
         </div>
 
-        {/* Right: Results side */}
+        {/* Right: Score only */}
         <div className={styles.panel}>
-          <h2 className={styles.h2}>2) Results</h2>
+          <h2 className={styles.h2}>2) Result</h2>
 
-          <ResultSection title="Summary (Model 1)" updatedAt={lastUpdated} show={!!summary}>
-            <p className={styles.summaryText}>{summary || '—'}</p>
+          <ResultSection
+            title="Final Model Score"
+            updatedAt={lastUpdated}
+            show={finalModelScore != null}
+          >
+            <DecisionCard
+              thresholdScore={thresholdScore ?? 0.5}
+              finalModelScore={finalModelScore}
+              decision={null}  // decision text hidden for now
+            />
           </ResultSection>
 
-          <ResultSection title="Intuitive Score" updatedAt={lastUpdated} show={intuitiveScore != null}>
-            <IntuitiveMeter value={intuitiveScore} />
-          </ResultSection>
-
-          <ResultSection title="Key Anomalies" updatedAt={lastUpdated} show={anomalies?.length > 0}>
-            <AnomalyList anomalies={anomalies} />
-          </ResultSection>
-
-          <ResultSection title="Person Present" updatedAt={lastUpdated} show={personPresent != null}>
-            {personPresent == null ? '—' : (
-              <span className={`${styles.badge} ${personPresent ? styles.badgeYes : styles.badgeNo}`}>
-                {personPresent ? 'Yes' : 'No'}
-              </span>
-            )}
-          </ResultSection>
-
-          <ResultSection title="Threshold Score" updatedAt={lastUpdated} show={thresholdScore != null}>
-            {thresholdScore == null ? '—' : <code className={styles.codeBox}>{thresholdScore.toFixed(2)}</code>}
-          </ResultSection>
-
-          <ResultSection title="Final Model Score & Decision" updatedAt={lastUpdated} show={finalModelScore != null}>
-            <DecisionCard thresholdScore={thresholdScore} finalModelScore={finalModelScore} decision={decision} />
-          </ResultSection>
-
-          <ResultSection title="Summary-aligned Sub-clips" updatedAt={lastUpdated} show={clips?.length > 0}>
-            <ClipGrid clips={clips} />
-          </ResultSection>
-
-          <ResultSection title="Representative Frames" updatedAt={lastUpdated} show={frames?.length > 0}>
-            <FrameGrid frames={frames} />
-          </ResultSection>
+          {/* --- Temporarily hidden sections (keep for later) ---
+          <ResultSection title="Summary (Model 1)" ...>...</ResultSection>
+          <ResultSection title="Intuitive Score" ...>...</ResultSection>
+          <ResultSection title="Key Anomalies" ...>...</ResultSection>
+          <ResultSection title="Person Present" ...>...</ResultSection>
+          <ResultSection title="Threshold Score" ...>...</ResultSection>
+          <ResultSection title="Sub-clips" ...>...</ResultSection>
+          <ResultSection title="Frames" ...>...</ResultSection>
+          ------------------------------------------------------ */}
         </div>
       </section>
 
