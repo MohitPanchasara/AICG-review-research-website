@@ -6,6 +6,7 @@ import ResultSection from '@/components/ResultSection';
 import DecisionCard from '@/components/DecisionCard';
 import FooterBar from '@/components/FooterBar';
 import useVideoAnalysis from '@/components/useVideoAnalysis';
+import WipDisclaimer from '@/components/WipDisclaimer';
 
 export default function Home() {
   const {
@@ -21,8 +22,9 @@ export default function Home() {
     <main className={styles.page}>
       <div className={styles.bgGlow} aria-hidden />
 
-      <HeaderBar title="AI vs Real Video Classifier" subtitle="Upload a video → Analyze → Final score" />
+      <HeaderBar title="Real vs AI Generated Videos Detection" subtitle="Upload a video → Analyze → Final score" />
 
+    <WipDisclaimer />
       <section className={styles.panelGrid}>
         {/* Left: Uploader */}
         <div className={styles.panel}>
