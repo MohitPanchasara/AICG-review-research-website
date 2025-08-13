@@ -4,13 +4,24 @@ Live demo: [https://ai-video-detector.vercel.app/](https://ai-video-detector.ver
 
 A lightweight, production-ready demo that classifies videos as AI-generated vs. real and visualizes results on a sleek, cyberpunk-inspired single-page UI.
 
+## Initial Dataset Used:
+[Kaggle](https://www.kaggle.com/datasets/sanikatiwarekar/deep-fake-detection-dfd-entire-original-dataset/data)
+
+## Model Details
+- Backbone: `torchvision.models.densenet169`
+- Head: Dropout(0.3) → Linear(in_features, 2)
+- Training: CrossEntropy over 2 classes
+- Inference: softmax → P(class=AI) = final model score
+- Preprocessing: Resize(256) → CenterCrop(224) → ToTensor → Normalize(ImageNet mean/std)
+- Frame Sampling: ~16 evenly spaced frames; mean probability over frames
+
 ## Highlights
 - Single-video upload with inline preview
 - DenseNet-169 backend (FastAPI + PyTorch) returning a single final model score (probability of AI)
 - Real progress bar (load → sample → preprocess → infer → done)
 - Mock mode for instant demos when no backend URL is set
 - Expandable results layout — sections for summary, anomalies, frames, clips already scaffolded
-- Cyberpunk UI with glass panels & neon accents (Next.js + CSS Modules, no Tailwind)
+- UI with glass panels & neon accents (Next.js + CSS Modules, no Tailwind)
 - CORS-configurable backend, resilient error handling
 - Hosting: Vercel (frontend) + Hugging Face Spaces (backend, CPU)
 
@@ -74,7 +85,7 @@ public/
   - Response: Same shape as `status`, finalized with `"status": "done"` (and may include timings).
 
 ## Local Development
-You can run frontend and backend independently. The frontend reads one env var: `NEXT_PUBLIC_API_BASE_URL`.
+You can run the frontend and backend independently. The frontend reads one env var: `NEXT_PUBLIC_API_BASE_URL`.
 
 ### 1) Frontend (Next.js)
 ```bash
@@ -129,14 +140,6 @@ COPY . .
 RUN pip install -r requirements.txt
 CMD ["python", "main.py"]
 ```
-
-## Model Details
-- Backbone: `torchvision.models.densenet169`
-- Head: Dropout(0.3) → Linear(in_features, 2)
-- Training: CrossEntropy over 2 classes
-- Inference: softmax → P(class=AI) = final model score
-- Preprocessing: Resize(256) → CenterCrop(224) → ToTensor → Normalize(ImageNet mean/std)
-- Frame Sampling: ~16 evenly spaced frames; mean probability over frames
 
 ## WIP Disclaimer
 Work-in-progress alert: This is our smallest baseline model (DenseNet-169) and it's currently overfitting like it's cramming for finals. The real, multi-modal, multi-model architecture (smarter summaries, anomaly timelines, person checks, the works) is in the oven. In the meantime, upload a clip, kick the tires, and roast our baseline. Big upgrade landing soon. ✨
