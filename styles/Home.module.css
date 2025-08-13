@@ -1,0 +1,52 @@
+.page{
+  min-height: 100%;
+  display:flex;
+  flex-direction: column;
+  align-items: stretch;
+  position: relative;
+  padding-bottom: 80px;
+}
+.bgGlow{
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(1000px 600px at 20% 15%, rgba(168,85,247,0.18), transparent 60%),
+    radial-gradient(900px 700px at 80% 10%, rgba(255,122,69,0.12), transparent 65%);
+  pointer-events: none;
+  z-index: 0;
+}
+.panelGrid{
+  z-index: 1;
+  display: grid;
+  gap: 20px;
+  grid-template-columns: 1fr;
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+@media (min-width: 980px){ .panelGrid{ grid-template-columns: 1fr 1fr; } }
+
+.panel{
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04), 0 10px 35px rgba(0,0,0,0.35);
+}
+.h2{ margin: 6px 4px 14px; font-size: 18px; color: #fff; letter-spacing: .6px; }
+
+.errorBox{
+  margin-top: 14px; padding: 10px; border-radius: 10px;
+  background: rgba(255,92,138,0.12); border: 1px solid rgba(255,92,138,0.35);
+}
+.summaryText{ line-height: 1.55; }
+.badge{
+  display:inline-block; padding: 6px 10px; border-radius: 999px; font-weight: 600;
+  border: 1px solid rgba(255,255,255,0.18);
+}
+.badgeYes{ background: rgba(72,229,154,0.15); color: #b4ffd9; }
+.badgeNo{ background: rgba(255,92,138,0.15); color: #ffc1d3; }
+.codeBox{
+  padding: 4px 8px; border-radius: 8px;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.18);
+}

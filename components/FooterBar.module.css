@@ -1,0 +1,10 @@
+.footer{
+  z-index:1; position:fixed; bottom:0; left:0; right:0;
+  display:flex; justify-content:center; gap:12px; align-items:center;
+  padding:10px 14px; background: linear-gradient(to top, rgba(11,13,19,0.8), rgba(11,13,19,0));
+  border-top: 1px solid var(--border);
+}
+.mock{
+  font-size: 11px; opacity: .8; display:inline-block; padding: 2px 8px; border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.06);
+}

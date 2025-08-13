@@ -1,0 +1,13 @@
+.row{ display:flex; flex-wrap: wrap; gap:8px; }
+.chip{
+  display:flex; align-items:center; gap:8px; padding:6px 10px; border-radius: 999px;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14);
+}
+.label{ font-weight: 600; }
+.count{ opacity:.8; }
+.times{ display:flex; gap:6px; }
+.tsBtn{
+  border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.06);
+  color:#fff; padding: 2px 8px; border-radius: 999px; cursor:pointer;
+}
+.tsBtn:hover{ box-shadow: 0 0 12px rgba(168,85,247,0.35); }
