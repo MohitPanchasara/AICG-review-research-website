@@ -14,7 +14,6 @@
 /coverage
 
 # Cache files and weights
-/backend/weights/
 /backend/__pycache__/
 
 # next.js
