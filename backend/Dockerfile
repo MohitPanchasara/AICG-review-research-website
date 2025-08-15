@@ -3,7 +3,7 @@ FROM python:3.10-slim
 
 # System deps for OpenCV + video
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1 libglib2.0-0 ffmpeg && \
+    libgl1 libglib2.0-0 libsm6 libxext6 ffmpeg && \
     rm -rf /var/lib/apt/lists/*
 
 # Writable upload dir (Spaces repo FS is read-only; /tmp is writable)
@@ -34,7 +34,7 @@ ENV UPLOAD_DIR=/tmp/aivideo
 # Use the locally cached captioner to run fully offline at runtime
 ENV VIT_LOCAL_DIR=/app/weights/vit_captioner
 ENV VIT_BATCH=8
-ENV VIT_FP16=0                # CPU on Spaces → keep 0
+ENV VIT_FP16=0             
 
 # Generation knobs (your defaults)
 ENV VIT_MAX_LEN=80

@@ -8,10 +8,13 @@ import FooterBar from '@/components/FooterBar';
 import useVideoAnalysis from '@/components/useVideoAnalysis';
 import WipDisclaimer from '@/components/WipDisclaimer';
 import SummaryPlayer from '@/components/SummaryPlayer';
+import IntuitiveMeter from '@/components/IntuitiveMeter';
+import StageMeters from '@/components/StageMeters';
+
 
 export default function Home() {
   const {
-    file, videoUrl, status, progress, lastUpdated, isMock, errorMsg,
+    file, videoUrl, status, progress, lastUpdated, isMock, errorMsg, intuitionScore, intuitionSegments,
     // results
     // summary, intuitiveScore, anomalies, personPresent, thresholdScore, finalModelScore, clips, frames,
     thresholdScore, finalModelScore, summaryTimeline,
@@ -58,6 +61,10 @@ export default function Home() {
         <div className={styles.panel}>
           <h2 className={styles.h2}> Result</h2>
 
+          <ResultSection title="Pipeline Progress" updatedAt={lastUpdated} show={status === 'processing' || status === 'done'}>
+  <StageMeters progress={progress} />
+</ResultSection>
+
           <ResultSection
             title="Summary"
             updatedAt={lastUpdated}
@@ -66,7 +73,18 @@ export default function Home() {
             <SummaryPlayer videoUrl={videoUrl} items={summaryTimeline} />
           </ResultSection>
 
+       
+
           <ResultSection
+            title="Intuition (Cosine/Jaccard)"
+            updatedAt={lastUpdated}
+            show={intuitionScore !== null}
+          >
+            <IntuitiveMeter value={intuitionScore} />
+          </ResultSection>
+
+
+             <ResultSection
             title="Final Model Score"
             updatedAt={lastUpdated}
             show={finalModelScore != null}
@@ -77,6 +95,7 @@ export default function Home() {
               decision={null}  // decision text hidden for now
             />
           </ResultSection>
+
 
 
           {/* --- Temporarily hidden sections (keep for later) ---

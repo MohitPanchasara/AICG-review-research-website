@@ -16,6 +16,9 @@ export default function useVideoAnalysis() {
   const [thresholdScore, setThresholdScore] = useState(0.5);
   const [finalModelScore, setFinalModelScore] = useState(null);
 
+  const [intuitionScore, setIntuitionScore] = useState(null);        // 0..100
+  const [intuitionSegments, setIntuitionSegments] = useState([]);    // list of dicts
+
   const jobIdRef = useRef(null);
   const pollAbortRef = useRef(null);
   const isMock = !API_BASE;
@@ -134,6 +137,8 @@ export default function useVideoAnalysis() {
           if (Array.isArray(p.summary_timeline)) setSummaryTimeline(p.summary_timeline);
           if (typeof p.threshold_score === 'number') setThresholdScore(p.threshold_score);
           if (typeof p.final_model_score === 'number') setFinalModelScore(p.final_model_score);
+          if (typeof p.intuitive_score === 'number') setIntuitionScore(p.intuitive_score);
+          if (Array.isArray(p.intuition_segments)) setIntuitionSegments(p.intuition_segments);
 
           if (typeof s?.progress === 'number') setProgress(Math.max(0, Math.min(100, s.progress)));
           setLastUpdated(Date.now());  // <-- numeric
@@ -153,6 +158,8 @@ export default function useVideoAnalysis() {
         if (Array.isArray(p2.summary_timeline)) setSummaryTimeline(p2.summary_timeline);
         if (typeof p2.threshold_score === 'number') setThresholdScore(p2.threshold_score);
         if (typeof p2.final_model_score === 'number') setFinalModelScore(p2.final_model_score);
+        if (typeof p2.intuitive_score === 'number') setIntuitionScore(p2.intuitive_score);
+        if (Array.isArray(p2.intuition_segments)) setIntuitionSegments(p2.intuition_segments);
 
         if (typeof r?.progress === 'number') setProgress(Math.max(0, Math.min(100, r.progress)));
         setLastUpdated(Date.now());    // <-- numeric
@@ -181,6 +188,8 @@ export default function useVideoAnalysis() {
     errorMsg,
     thresholdScore,
     finalModelScore,
+    intuitionScore,
+    intuitionSegments,
     summaryTimeline,
     onFileChange,
     handleAnalyze,

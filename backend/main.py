@@ -6,6 +6,9 @@
 import os, time, uuid, shutil, tempfile, threading, logging
 from typing import Dict, Any
 from contextlib import asynccontextmanager
+# new import
+from intuition import IntuitionScorer
+
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -17,6 +20,15 @@ from inference import VideoScorer                 # your DenseNet-169 scorer
 from inference_summary_vitgpt2 import VideoSummarizer  # NEW
 
 from fastapi.responses import JSONResponse
+
+import os
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+os.environ.setdefault("PYTHONUNBUFFERED", "1")
+# Optional CPU taming (tweak to taste)
+os.environ.setdefault("OMP_NUM_THREADS", "4")
+os.environ.setdefault("MKL_NUM_THREADS", "4")
+
 
 def _no_cache(data: dict) -> JSONResponse:
     resp = JSONResponse(data)
@@ -30,6 +42,13 @@ def _no_cache(data: dict) -> JSONResponse:
 def _env_list(name: str, default: str) -> list[str]:
     v = os.getenv(name, default)
     return [x.strip() for x in v.split(",") if x.strip()]
+
+# Intuition scorer env (optional overrides)
+INT_HISTORY   = int(os.getenv("INT_HISTORY", "1"))
+INT_W_TFIDF   = float(os.getenv("INT_W_TFIDF", "0.7"))
+INT_W_JACCARD = float(os.getenv("INT_W_JACCARD", "0.3"))
+INT_FLAG_THR  = float(os.getenv("INT_FLAG_THR", "0.60"))
+
 
 ALLOWED_ORIGINS = _env_list("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
 ALLOWED_ORIGIN_REGEX = os.getenv("ALLOWED_ORIGIN_REGEX")  # e.g., r"https://.*\.vercel\.app"
@@ -54,6 +73,9 @@ SEGMENT_LEN   = float(os.getenv("SEGMENT_LEN", "3.0"))
 SEGMENT_STRIDE= float(os.getenv("SEGMENT_STRIDE", "1.0"))
 SEGMENT_MAX   = int(os.getenv("SEGMENT_MAX", "9999"))
 
+SUMMARY_TIME_BUDGET_S = float(os.getenv("SUMMARY_TIME_BUDGET_S", "25.0"))
+SEGMENT_MAX   = int(os.getenv("SEGMENT_MAX", "12"))  # tighten default
+
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 logging.basicConfig(level=logging.INFO)
@@ -73,6 +95,13 @@ async def lifespan(app: FastAPI):
         app.state.scorer = VideoScorer(MODEL_PATH)
 
         logger.info("Loading vit-gpt2 summarizer (nlpconnect/vit-gpt2-image-captioning)...")
+        app.state.intuition = IntuitionScorer(
+    history=INT_HISTORY,
+    w_tfidf=INT_W_TFIDF,
+    w_jaccard=INT_W_JACCARD,
+    flag_threshold=INT_FLAG_THR,
+)
+
         app.state.summarizer = VideoSummarizer(
     model_id=VIT_MODEL_ID,
     local_dir=VIT_LOCAL_DIR,
@@ -91,6 +120,7 @@ async def lifespan(app: FastAPI):
         raise
     yield
     # no special shutdown
+
 
 app = FastAPI(title="AIVideoClassifier (summary + score)", lifespan=lifespan)
 
@@ -167,18 +197,20 @@ def _worker(job_id: str) -> None:
     if not job: return
     _update_job(job_id, {"status": "running", "progress": 1})
 
-    summarizer: VideoSummarizer = app.state.summarizer
-    scorer:     VideoScorer     = app.state.scorer
+    summarizer  = app.state.summarizer
+    intuition   = app.state.intuition
+    scorer      = app.state.scorer
 
     try:
-        # ---- Stage 1: Summary (10..60)
-        sum_cb = _stage_progress(job_id, 10, 60)
+        # 1) Summary (10..55)
+        sum_cb = _stage_progress(job_id, 10, 55)
         sres = summarizer.predict(
             job["path"],
             segment_len=SEGMENT_LEN,
             stride=SEGMENT_STRIDE,
             max_segments=SEGMENT_MAX,
-            progress=sum_cb
+            time_budget_s=SUMMARY_TIME_BUDGET_S,
+            progress=sum_cb,
         )
         _update_job(job_id, {
             "partial": {
@@ -187,10 +219,28 @@ def _worker(job_id: str) -> None:
                 "summary_duration": sres.get("duration", None),
             }
         })
-        _set_progress(job_id, 60)
+        _set_progress(job_id, 55)
+        
 
-        # ---- Stage 2: DenseNet score (60..100)
-        cls_cb = _stage_progress(job_id, 60, 100)
+        # 2) Intuition score (55..65) — fast, pure CPU/numpy
+        int_cb = _stage_progress(job_id, 55, 65)
+        int_cb(5, "intuition:start")
+        items = _get_job(job_id)["partial"]["summary_timeline"]
+        per_seg, final_score = intuition.compute(items)
+        int_cb(90, "intuition:computed")
+
+        # store both the final and per-segment (you said you'd reuse it later)
+        _update_job(job_id, {
+            "partial": {
+                **_get_job(job_id)["partial"],
+                "intuitive_score": round(float(final_score), 2),    # 0..100
+                "intuition_segments": per_seg,                      # list of dicts
+            }
+        })
+        _set_progress(job_id, 65)
+
+        # 3) DenseNet (65..100)
+        cls_cb = _stage_progress(job_id, 65, 100)
         cres = scorer.predict(job["path"], progress=cls_cb)
         _update_job(job_id, {
             "partial": {
@@ -236,3 +286,22 @@ def result(job_id: str):
         "elapsed_s": job.get("elapsed_s", None),
         "error": job["error"],
     })
+
+
+@app.get("/config")
+def config():
+    return {
+        "summary": {
+            "window_sec": SEGMENT_LEN,
+            "stride_sec": SEGMENT_STRIDE,
+            "max_windows": SEGMENT_MAX,
+            "time_budget_s": SUMMARY_TIME_BUDGET_S,
+        },
+        "intuition": {
+            "history": INT_HISTORY,
+            "w_tfidf": INT_W_TFIDF,
+            "w_jaccard": INT_W_JACCARD,
+            "flag_threshold": INT_FLAG_THR,
+        },
+    }
+
