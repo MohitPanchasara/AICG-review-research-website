@@ -1,11 +1,25 @@
+// components/ResultSection.js
 import styles from './ResultSection.module.css';
 
-export default function ResultSection({ title, updatedAt, show, children }) {
+function formatTs(ts) {
+  if (!ts) return null;
+  try {
+    return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  } catch {
+    return null;
+  }
+}
+
+export default function ResultSection({ title, updatedAt, show = true, children }) {
+  if (!show) return null;
+  const when = formatTs(updatedAt);
   return (
-    <section className={styles.wrap}>
-      <h3 className={styles.h3}>{title}</h3>
-      {show ? children : <div className={styles.placeholder}>No data yet</div>}
-      {show && updatedAt && <div className={styles.updated}>Last updated {updatedAt}</div>}
+    <section className={styles.section}>
+      <div className={styles.header}>
+        <h3 className={styles.title}>{title}</h3>
+        {when ? <div className={styles.updated}>Last updated {when}</div> : null}
+      </div>
+      <div className={styles.body}>{children}</div>
     </section>
   );
 }
