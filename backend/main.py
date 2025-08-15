@@ -7,6 +7,8 @@ import os, time, uuid, shutil, tempfile, threading, logging
 from typing import Dict, Any
 from contextlib import asynccontextmanager
 
+from fastapi.middleware.cors import CORSMiddleware
+
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -28,6 +30,9 @@ def _no_cache(data: dict) -> JSONResponse:
 def _env_list(name: str, default: str) -> list[str]:
     v = os.getenv(name, default)
     return [x.strip() for x in v.split(",") if x.strip()]
+
+ALLOWED_ORIGINS = _env_list("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+ALLOWED_ORIGIN_REGEX = os.getenv("ALLOWED_ORIGIN_REGEX")  # e.g., r"https://.*\.vercel\.app"
 
 MODEL_PATH = os.getenv("MODEL_PATH", "weights/model.pth")
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/tmp/aivideo")
@@ -92,6 +97,7 @@ app = FastAPI(title="AIVideoClassifier (summary + score)", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=ALLOWED_ORIGIN_REGEX,  # ← enables any *.vercel.app preview
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
