@@ -14,6 +14,16 @@ from pydantic import BaseModel
 from inference import VideoScorer                 # your DenseNet-169 scorer
 from inference_summary_vitgpt2 import VideoSummarizer  # NEW
 
+from fastapi.responses import JSONResponse
+
+def _no_cache(data: dict) -> JSONResponse:
+    resp = JSONResponse(data)
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
+
+
 # ---------- Env / config ----------
 def _env_list(name: str, default: str) -> list[str]:
     v = os.getenv(name, default)
@@ -197,13 +207,13 @@ def status(job_id: str):
     job = _get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="unknown job_id")
-    return {
+    return _no_cache({
         "status": job["status"],
         "progress": int(job["progress"]),
         "partial": job["partial"],
         "assets": job["assets"],
         "error": job["error"],
-    }
+    })
 
 @app.get("/result")
 def result(job_id: str):
@@ -211,12 +221,12 @@ def result(job_id: str):
     if not job:
         raise HTTPException(status_code=404, detail="unknown job_id")
     if job["status"] != "done":
-        return status(job_id)
-    return {
+        return status(job_id)  # already no-cache
+    return _no_cache({
         "status": job["status"],
         "progress": int(job["progress"]),
         "partial": job["partial"],
         "assets": job["assets"],
         "elapsed_s": job.get("elapsed_s", None),
         "error": job["error"],
-    }
+    })

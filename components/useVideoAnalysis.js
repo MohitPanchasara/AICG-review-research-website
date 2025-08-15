@@ -1,210 +1,221 @@
 // components/useVideoAnalysis.js
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { track } from '@vercel/analytics';
+// Hook to upload a video, call the backend, and poll for progressive results.
+// Includes cache-busting + no-store for Vercel/CDN, and handles partial updates.
+
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+const POLL_INTERVAL_MS = 900;
 
 export default function useVideoAnalysis() {
+  // ----- UI state -----
   const [file, setFile] = useState(null);
   const [videoUrl, setVideoUrl] = useState('');
-  const [jobId, setJobId] = useState(null);
   const [status, setStatus] = useState('idle'); // idle | ready | processing | done | failed
   const [progress, setProgress] = useState(0);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const [summary, setSummary] = useState('');
-  const [intuitiveScore, setIntuitiveScore] = useState(null);
-  const [anomalies, setAnomalies] = useState([]);
-  const [personPresent, setPersonPresent] = useState(null);
-  const [thresholdScore, setThresholdScore] = useState(null);
+  // Partial/final results from backend
+  const [summaryTimeline, setSummaryTimeline] = useState([]); // [[start,end,text], ...]
+  const [thresholdScore, setThresholdScore] = useState(0.5);
   const [finalModelScore, setFinalModelScore] = useState(null);
-  const [clips, setClips] = useState([]);
-  const [frames, setFrames] = useState([]);
 
-  const pollingRef = useRef(null);
-  const isMock = !API_BASE;
+  // internals
+  const jobIdRef = useRef(null);
+  const pollAbortRef = useRef(null);
+  const isMock = !API_BASE; // if no backend configured, stay in mock mode
 
-  const [summaryTimeline, setSummaryTimeline] = useState([]); // [[start,end,text],...]
+  // ------------- helpers (fetch with no-store & cache-buster) -------------
+  const getJSON = useCallback(async (url) => {
+    const res = await fetch(url, {
+      method: 'GET',
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
+      },
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      throw new Error(`GET ${url} → ${res.status}: ${txt}`);
+    }
+    return res.json();
+  }, []);
 
-  useEffect(() => () => { if (videoUrl) URL.revokeObjectURL(videoUrl); }, [videoUrl]);
+  const fetchStatus = useCallback(
+    async (jid) => {
+      const url = new URL(`${API_BASE}/status`);
+      url.searchParams.set('job_id', jid);
+      url.searchParams.set('_', Date.now().toString()); // cache-buster
+      return getJSON(url.toString());
+    },
+    [getJSON]
+  );
 
-  const decision = useMemo(() => {
-    if (finalModelScore == null || thresholdScore == null) return null;
-    return finalModelScore >= thresholdScore ? 'AI-Generated' : 'Real';
-  }, [finalModelScore, thresholdScore]);
+  const fetchResult = useCallback(
+    async (jid) => {
+      const url = new URL(`${API_BASE}/result`);
+      url.searchParams.set('job_id', jid);
+      url.searchParams.set('_', Date.now().toString());
+      return getJSON(url.toString());
+    },
+    [getJSON]
+  );
 
-  function resetResults() {
-    setJobId(null);
-    setProgress(0);
-    setLastUpdated(null);
-    setSummary('');
-    setIntuitiveScore(null);
-    setAnomalies([]);
-    setPersonPresent(null);
-    setThresholdScore(null);
-    setFinalModelScore(null);
-    setClips([]);
-    setFrames([]);
-    setSummaryTimeline([]);
-    setErrorMsg('');
-    if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
-  }
+  // ------------- lifecycle / cleanup -------------
+  useEffect(() => {
+    return () => {
+      // cleanup object URL & polling on unmount
+      if (videoUrl) URL.revokeObjectURL(videoUrl);
+      if (pollAbortRef.current) pollAbortRef.current.abort();
+    };
+  }, [videoUrl]);
 
-  function onFileChange(e) {
-    const f = e.target.files?.[0];
+  // ------------- public API -------------
+  const onFileChange = useCallback((e) => {
+    const f = e?.target?.files?.[0];
     if (!f) return;
+    // Reset current state first
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
     setFile(f);
     setVideoUrl(URL.createObjectURL(f));
     setStatus('ready');
-    resetResults();
-  }
+    setProgress(0);
+    setErrorMsg('');
+    setSummaryTimeline([]);
+    setFinalModelScore(null);
+    setThresholdScore(0.5);
+    jobIdRef.current = null;
+  }, [videoUrl]);
 
-  function hardReset() {
-    setFile(null);
+  const hardReset = useCallback(() => {
     if (videoUrl) URL.revokeObjectURL(videoUrl);
+    setFile(null);
     setVideoUrl('');
     setStatus('idle');
-    resetResults();
-  }
-
-  async function handleAnalyze() {
-    if (!file || status === 'processing') return;
+    setProgress(0);
+    setLastUpdated(null);
     setErrorMsg('');
-    setStatus('processing');
-    setProgress(1);
+    setSummaryTimeline([]);
+    setFinalModelScore(null);
+    setThresholdScore(0.5);
+    if (pollAbortRef.current) pollAbortRef.current.abort();
+    jobIdRef.current = null;
+  }, [videoUrl]);
 
-    if (isMock) return mockRun();
+  const handleAnalyze = useCallback(async () => {
+    if (isMock) {
+      setErrorMsg('Backend not configured. Set NEXT_PUBLIC_API_BASE_URL to your API.');
+      return;
+    }
+    if (!file) return;
 
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await fetch(`${API_BASE}/analyze`, { method: 'POST', body: fd });
-      if (!res.ok) throw new Error(`Analyze failed (${res.status})`);
-      const data = await res.json();
-      const jid = data.job_id;
-      setJobId(jid);
-      startPolling(jid);
-    } catch (err) {
-      setStatus('failed');
-      setErrorMsg(err.message || 'Analyze request failed');
-    }
-  }
+      // cancel any previous polling
+      if (pollAbortRef.current) pollAbortRef.current.abort();
 
-  function startPolling(jid) {
-    if (pollingRef.current) clearInterval(pollingRef.current);
-    pollingRef.current = setInterval(async () => {
-      try {
-        const r = await fetch(`${API_BASE}/status?job_id=${encodeURIComponent(jid)}`);
-        if (!r.ok) throw new Error(`Status ${r.status}`);
-        const s = await r.json();
+      setStatus('processing');
+      setProgress(5);
+      setErrorMsg('');
+      setLastUpdated(new Date());
 
-        setProgress(Number(s?.progress ?? 0));
-        setStatus(s?.status === 'done' ? 'done' : s?.status === 'failed' ? 'failed' : 'processing');
-        setLastUpdated(new Date().toLocaleTimeString());
-
-        const p = s?.partial || {};
-        if (typeof p.summary === 'string') setSummary(p.summary);
-        if (typeof p.intuitive_score === 'number') setIntuitiveScore(Math.round(p.intuitive_score));
-        if (Array.isArray(p.anomalies)) setAnomalies(p.anomalies);
-        if (typeof p.person_present === 'boolean') setPersonPresent(p.person_present);
-        if (typeof p.threshold_score === 'number') setThresholdScore(p.threshold_score);
-        if (typeof p.final_model_score === 'number') setFinalModelScore(p.final_model_score);
-
-        const assets = s?.assets || {};
-        if (Array.isArray(assets.clips)) setClips(assets.clips);
-        if (Array.isArray(assets.frames)) setFrames(assets.frames);
-
-        if (Array.isArray(p.summary_timeline)) setSummaryTimeline(p.summary_timeline);
-        if (typeof p.summary_duration === 'number') {/* you can store if needed */}
-
-        if (s?.status === 'done' || s?.status === 'failed') {
-          clearInterval(pollingRef.current); pollingRef.current = null;
-          if (s?.status === 'done') {
-            try {
-              const rr = await fetch(`${API_BASE}/result?job_id=${encodeURIComponent(jid)}`);
-              if (rr.ok) {
-                const fin = await rr.json();
-                const fp = fin?.partial || {};
-                if (typeof fp.summary === 'string') setSummary(fp.summary);
-                if (typeof fp.intuitive_score === 'number') setIntuitiveScore(Math.round(fp.intuitive_score));
-                if (Array.isArray(fp.anomalies)) setAnomalies(fp.anomalies);
-                if (typeof fp.person_present === 'boolean') setPersonPresent(fp.person_present);
-                if (typeof fp.threshold_score === 'number') setThresholdScore(fp.threshold_score);
-                if (typeof fp.final_model_score === 'number') setFinalModelScore(fp.final_model_score);
-                const fa = fin?.assets || {};
-                if (Array.isArray(fa.clips)) setClips(fa.clips);
-                if (Array.isArray(fa.frames)) setFrames(fa.frames);
-                setLastUpdated(new Date().toLocaleTimeString());
-              }
-            } catch {}
-          } else {
-            setErrorMsg(s?.error || 'Processing failed');
-          }
-        }
-      } catch (e) {
-        setStatus('failed');
-        setErrorMsg(e.message || 'Polling failed');
-        if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
-      }
-    }, 2000);
-  }
-
-  function mockRun() {
-    setProgress(8);
-    setTimeout(() => {
-      setSummary('A person speaks to camera indoors; occasional hand gestures; background poster visible.');
-      setIntuitiveScore(67);
-      setPersonPresent(true);
-      setAnomalies([{ label: 'hand-morph', count: 2, timestamps: [3.2, 8.7] }]);
-      setThresholdScore(0.5);
-      setFinalModelScore(0.62);
-      setFrames([
-        { url: '/placeholder/frame1.jpg', t: 3.2, note: 'fingers look irregular' },
-        { url: '/placeholder/frame2.jpg', t: 8.7, note: 'wrist contour artifact' }
-      ]);
-      setProgress(45);
-      setLastUpdated(new Date().toLocaleTimeString());
-    }, 1200);
-
-    setTimeout(() => {
-      setSummary(prev => prev + ' Lighting flicker around 12s.');
-      setAnomalies(prev => [...prev, { label: 'lighting-flicker', count: 1, timestamps: [12.1] }]);
-      setClips([
-        { url: '/placeholder/clip1.mp4', start: 2.9, end: 3.6, caption: 'hand anomaly' },
-        { url: '/placeholder/clip2.mp4', start: 11.8, end: 12.4, caption: 'lighting flicker' }
-      ]);
-      setProgress(78);
-      setLastUpdated(new Date().toLocaleTimeString());
-    }, 2600);
-
-    setTimeout(() => {
-      setFinalModelScore(0.82);
-      setProgress(100);
-      setStatus('done');
-      setLastUpdated(new Date().toLocaleTimeString());
-    }, 4200);
-  }
-
-  // --------- Vercel Analytics: Track when inference completes ---------
-  useEffect(() => {
-    if (status === 'done' && finalModelScore != null) {
-      // Keep it anonymous: avoid filenames/PII
-      track('analysis_done', {
-        score: Number(finalModelScore.toFixed(3)),
-        frames: Array.isArray(frames) ? frames.length : 0,
-        hasClips: Array.isArray(clips) && clips.length > 0 ? 1 : 0,
-        mock: isMock ? 1 : 0,
+      // 1) POST /analyze
+      const form = new FormData();
+      form.append('file', file);
+      const analyzeRes = await fetch(`${API_BASE}/analyze?_=${Date.now()}`, {
+        method: 'POST',
+        body: form,
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        },
       });
+      if (!analyzeRes.ok) {
+        const txt = await analyzeRes.text().catch(() => '');
+        throw new Error(`analyze failed: ${analyzeRes.status} ${txt}`);
+      }
+      const { job_id } = await analyzeRes.json();
+      jobIdRef.current = job_id;
+
+      // 2) Poll /status until done, then fetch /result
+      const controller = new AbortController();
+      pollAbortRef.current = controller;
+
+      const poll = async () => {
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          if (controller.signal.aborted) return;
+
+          let s;
+          try {
+            s = await fetchStatus(jobIdRef.current);
+          } catch (err) {
+            // transient network error: keep trying
+            await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+            continue;
+          }
+
+          // update partials
+          const p = s?.partial || {};
+          if (Array.isArray(p.summary_timeline)) setSummaryTimeline(p.summary_timeline);
+          if (typeof p.threshold_score === 'number') setThresholdScore(p.threshold_score);
+          if (typeof p.final_model_score === 'number') setFinalModelScore(p.final_model_score);
+
+          if (typeof s?.progress === 'number') setProgress(Math.max(0, Math.min(100, s.progress)));
+          setLastUpdated(new Date());
+
+          if (s?.status === 'failed') {
+            setStatus('failed');
+            setErrorMsg(s?.error || 'Processing failed.');
+            return;
+          }
+          if (s?.status === 'done') break;
+
+          await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        }
+
+        // fetch final result (no-cache + cache-buster)
+        const r = await fetchResult(jobIdRef.current);
+        const p2 = r?.partial || {};
+        if (Array.isArray(p2.summary_timeline)) setSummaryTimeline(p2.summary_timeline);
+        if (typeof p2.threshold_score === 'number') setThresholdScore(p2.threshold_score);
+        if (typeof p2.final_model_score === 'number') setFinalModelScore(p2.final_model_score);
+
+        if (typeof r?.progress === 'number') setProgress(Math.max(0, Math.min(100, r.progress)));
+        setLastUpdated(new Date());
+        setStatus('done');
+      };
+
+      poll().catch((e) => {
+        console.error(e);
+        setStatus('failed');
+        setErrorMsg(String(e?.message || e));
+      });
+    } catch (e) {
+      console.error(e);
+      setStatus('failed');
+      setErrorMsg(String(e?.message || e));
     }
-  }, [status, finalModelScore, frames, clips, isMock]);
-  // --------------------------------------------------------------------
+  }, [file, fetchStatus, fetchResult, isMock]);
 
   return {
-    file, videoUrl, status, progress, lastUpdated, isMock, errorMsg,
-    summary, intuitiveScore, anomalies, personPresent, thresholdScore, finalModelScore, clips, frames,
-    decision,
-    onFileChange, handleAnalyze, hardReset,
+    // state
+    file,
+    videoUrl,
+    status,
+    progress,
+    lastUpdated,
+    isMock,
+    errorMsg,
+    thresholdScore,
+    finalModelScore,
     summaryTimeline,
+
+    // handlers
+    onFileChange,
+    handleAnalyze,
+    hardReset,
   };
 }
