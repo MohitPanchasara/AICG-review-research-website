@@ -15,6 +15,8 @@
 
 # Cache files and weights
 /backend/__pycache__/
+# Backend model artifacts — keep out of Git
+backend/weights/
 
 # next.js
 /.next/

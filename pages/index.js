@@ -7,13 +7,14 @@ import DecisionCard from '@/components/DecisionCard';
 import FooterBar from '@/components/FooterBar';
 import useVideoAnalysis from '@/components/useVideoAnalysis';
 import WipDisclaimer from '@/components/WipDisclaimer';
+import SummaryPlayer from '@/components/SummaryPlayer';
 
 export default function Home() {
   const {
     file, videoUrl, status, progress, lastUpdated, isMock, errorMsg,
     // results
     // summary, intuitiveScore, anomalies, personPresent, thresholdScore, finalModelScore, clips, frames,
-    thresholdScore, finalModelScore,
+    thresholdScore, finalModelScore, summaryTimeline,
     // actions
     onFileChange, handleAnalyze, hardReset,
   } = useVideoAnalysis();
@@ -24,7 +25,7 @@ export default function Home() {
 
       <HeaderBar title="Real vs AI Generated Videos Detection" subtitle="Upload a video → Analyze → Final score" />
 
-    <WipDisclaimer />
+      <WipDisclaimer />
       <section className={styles.panelGrid}>
         {/* Left: Uploader */}
         <div className={styles.panel}>
@@ -58,6 +59,14 @@ export default function Home() {
           <h2 className={styles.h2}> Result</h2>
 
           <ResultSection
+            title="Summary"
+            updatedAt={lastUpdated}
+            show={Boolean(videoUrl) && (summaryTimeline?.length > 0)}
+          >
+            <SummaryPlayer videoUrl={videoUrl} items={summaryTimeline} />
+          </ResultSection>
+
+          <ResultSection
             title="Final Model Score"
             updatedAt={lastUpdated}
             show={finalModelScore != null}
@@ -69,6 +78,7 @@ export default function Home() {
             />
           </ResultSection>
 
+
           {/* --- Temporarily hidden sections (keep for later) ---
           <ResultSection title="Summary (Model 1)" ...>...</ResultSection>
           <ResultSection title="Intuitive Score" ...>...</ResultSection>
@@ -78,6 +88,8 @@ export default function Home() {
           <ResultSection title="Sub-clips" ...>...</ResultSection>
           <ResultSection title="Frames" ...>...</ResultSection>
           ------------------------------------------------------ */}
+
+
         </div>
       </section>
 

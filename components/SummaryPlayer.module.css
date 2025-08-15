@@ -1,0 +1,45 @@
+.wrap{
+  /* fixed width for the right section so text doesn't change layout width */
+  width: min(520px, 100%);
+  flex: 0 0 auto;                 /* don't grow/shrink with text */
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+/* medium player */
+.video{
+  width: 100%;                     /* fill the fixed .wrap width */
+  aspect-ratio: 16 / 9;
+  height: auto;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: #000;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+}
+
+.caption{
+  width: 100%;                     /* fixed to .wrap, not content length */
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: var(--text);
+  line-height: 1.5;
+
+  /* wrap long text to new lines without expanding width */
+  white-space: pre-wrap;           /* respect \n if any */
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+
+  min-height: 48px;
+}
+
+.placeholder{ color: var(--muted); }
+
+/* optional: on very small screens, allow full width */
+@media (max-width: 640px){
+  .wrap{ width: 100%; }
+}

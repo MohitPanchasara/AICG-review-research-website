@@ -25,6 +25,8 @@ export default function useVideoAnalysis() {
   const pollingRef = useRef(null);
   const isMock = !API_BASE;
 
+  const [summaryTimeline, setSummaryTimeline] = useState([]); // [[start,end,text],...]
+
   useEffect(() => () => { if (videoUrl) URL.revokeObjectURL(videoUrl); }, [videoUrl]);
 
   const decision = useMemo(() => {
@@ -44,6 +46,7 @@ export default function useVideoAnalysis() {
     setFinalModelScore(null);
     setClips([]);
     setFrames([]);
+    setSummaryTimeline([]);
     setErrorMsg('');
     if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
   }
@@ -111,6 +114,9 @@ export default function useVideoAnalysis() {
         const assets = s?.assets || {};
         if (Array.isArray(assets.clips)) setClips(assets.clips);
         if (Array.isArray(assets.frames)) setFrames(assets.frames);
+
+        if (Array.isArray(p.summary_timeline)) setSummaryTimeline(p.summary_timeline);
+        if (typeof p.summary_duration === 'number') {/* you can store if needed */}
 
         if (s?.status === 'done' || s?.status === 'failed') {
           clearInterval(pollingRef.current); pollingRef.current = null;
@@ -199,5 +205,6 @@ export default function useVideoAnalysis() {
     summary, intuitiveScore, anomalies, personPresent, thresholdScore, finalModelScore, clips, frames,
     decision,
     onFileChange, handleAnalyze, hardReset,
+    summaryTimeline,
   };
 }
