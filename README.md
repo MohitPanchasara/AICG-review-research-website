@@ -141,9 +141,6 @@ RUN pip install -r requirements.txt
 CMD ["python", "main.py"]
 ```
 
-## WIP Disclaimer
-Work-in-progress alert: This is our smallest baseline model (DenseNet-169) and it's currently overfitting like it's cramming for finals. The real, multi-modal, multi-model architecture (smarter summaries, anomaly timelines, person checks, the works) is in the oven. In the meantime, upload a clip, kick the tires, and roast our baseline. Big upgrade landing soon. ✨
-
 ## CORS & Security
 - Backend allows only origins from `ALLOWED_ORIGINS`.
 - Add your Vercel domain (and any custom domain) there, then restart the Space.
